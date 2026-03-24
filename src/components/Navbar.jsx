@@ -33,6 +33,7 @@ const Navbar = () => {
 
   const handleSignOut = async () => {
     setShowUserMenu(false);
+    setIsMobileMenuOpen(false);
     await signOut();
   };
 
@@ -221,14 +222,23 @@ const Navbar = () => {
                 Sign In
               </Link>
             ) : (
-              <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-primary text-white font-black text-lg">
-                  {getInitials()}
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-primary text-white font-black text-lg">
+                    {getInitials()}
+                  </div>
+                  <div className="flex-grow overflow-hidden">
+                    <p className="font-bold text-slate-900 truncate">{profile?.full_name || 'User'}</p>
+                    <p className="text-slate-400 text-xs truncate">{user.email}</p>
+                  </div>
                 </div>
-                <div className="flex-grow overflow-hidden">
-                  <p className="font-bold text-slate-900 truncate">{profile?.full_name || 'User'}</p>
-                  <p className="text-slate-400 text-xs truncate">{user.email}</p>
-                </div>
+                <button 
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl bg-red-50 text-red-500 font-bold text-sm transition-colors"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>logout</span>
+                  Sign Out
+                </button>
               </div>
             )}
           </div>

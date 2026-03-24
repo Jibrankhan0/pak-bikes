@@ -98,7 +98,7 @@ const Auth = () => {
   const handleOtpChange = (i, val) => {
     if (!/^\d?$/.test(val)) return;
     const next = [...otp]; next[i] = val; setOtp(next); setError('');
-    if (val && i < 5) otpRefs.current[i + 1]?.focus();
+    if (val && i < 7) otpRefs.current[i + 1]?.focus();
     if (next.every(d => d !== '')) handleVerifyOtp(next.join(''));
   };
 
@@ -136,7 +136,7 @@ const Auth = () => {
           {/* ── OTP Verification Step ── */}
           {step === 'otp' ? (
             <>
-              <button onClick={() => { setStep('form'); setOtp(['','','','','','']); setError(''); }}
+              <button onClick={() => { setStep('form'); setOtp(['', '', '', '', '', '', '', '']); setError(''); }}
                 className="flex items-center gap-1 text-white/50 hover:text-white transition-colors mb-6 text-sm">
                 <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>Back
               </button>
@@ -148,7 +148,7 @@ const Auth = () => {
                 </div>
                 <h1 className="text-2xl font-headline font-extrabold text-white mb-2">Enter OTP Code</h1>
                 <p className="text-white/50 text-sm">
-                  We sent a 6-digit code to<br />
+                  We sent an 8-digit code to<br />
                   <span className="text-white font-bold">{email}</span>
                 </p>
               </div>
@@ -161,18 +161,19 @@ const Auth = () => {
                 </div>
               )}
 
-              <div className="flex gap-1.5 justify-center mb-6" onPaste={handleOtpPaste}>
+              <div className="flex gap-1 sm:gap-2 justify-center mb-8" onPaste={handleOtpPaste}>
                 {otp.map((digit, i) => (
                   <input key={i} ref={el => otpRefs.current[i] = el}
-                    type="text" inputMode="numeric" maxLength={1}
+                    type="text" inputMode="numeric" pattern="\d*" maxLength={1}
                     value={digit}
                     onChange={e => handleOtpChange(i, e.target.value)}
                     onKeyDown={e => handleOtpKeyDown(i, e)}
                     disabled={loading}
-                    className="w-12 h-14 text-center text-xl font-extrabold text-white rounded-2xl outline-none transition-all"
+                    className="w-8 h-12 sm:w-11 sm:h-14 text-center text-xl font-black text-white rounded-xl sm:rounded-2xl outline-none transition-all"
                     style={{
                       background: digit ? 'rgba(37,211,102,0.2)' : 'rgba(255,255,255,0.08)',
-                      border: digit ? '2px solid rgba(37,211,102,0.6)' : '1px solid rgba(255,255,255,0.15)',
+                      border: digit ? '2.5px solid #25d366' : '1px solid rgba(255,255,255,0.15)',
+                      boxShadow: digit ? '0 0 12px rgba(37,211,102,0.2)' : 'none',
                     }}
                   />
                 ))}
