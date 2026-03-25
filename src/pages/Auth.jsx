@@ -27,14 +27,14 @@ const Auth = () => {
   // 2. Already logged in?
   useEffect(() => { 
     if (user) {
-      if (emailVerified) {
+      // Regardless of emailVerified, if the user is in the Auth page but already logged in,
+      // we should probably let them move to their intended destination (or home)
+      // unless they JUST signed up (handled by the 'sent' state).
+      if (!sent) {
         navigate(from, { replace: true }); 
-      } else {
-        // Logged in but not verified -> Stay on auth page and show the "Verification Sent" state
-        setSent(true);
       }
     }
-  }, [user, emailVerified, navigate, from]);
+  }, [user, sent, navigate, from]);
 
   const resetForm = (newTab) => {
     setTab(newTab); setError(''); setSent(false); setSignupPassword(''); setPassword('');

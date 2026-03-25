@@ -128,17 +128,27 @@ const Navbar = () => {
               /* User avatar + dropdown */
               <div className="relative" ref={userMenuRef}>
                 <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  onClick={() => {
+                    if (window.innerWidth < 768) {
+                      setIsMobileMenuOpen(true);
+                    } else {
+                      setShowUserMenu(!showUserMenu);
+                    }
+                  }}
                   className="flex items-center gap-2 transition-all active:scale-95"
                 >
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white shadow-md"
-                    style={{ background: 'linear-gradient(135deg, #25d366, #128c7e)' }}>
-                    {getInitials()}
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white shadow-md overflow-hidden bg-slate-100"
+                    style={!profile?.photo_url ? { background: 'linear-gradient(135deg, #25d366, #128c7e)' } : {}}>
+                    {profile?.photo_url ? (
+                      <img src={profile.photo_url} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      getInitials()
+                    )}
                   </div>
                   <span className={`hidden md:block text-sm font-bold transition-colors ${transparent ? 'text-white' : 'text-slate-700'}`}>
                     {(profile?.full_name || user.displayName || '').split(' ')[0] || 'Me'}
                   </span>
-                  <span className={`material-symbols-outlined text-sm transition-colors ${transparent ? 'text-white/70' : 'text-slate-400'}`} style={{ fontSize: '18px' }}>
+                  <span className={`hidden md:block material-symbols-outlined text-sm transition-colors ${transparent ? 'text-white/70' : 'text-slate-400'}`} style={{ fontSize: '18px' }}>
                     {showUserMenu ? 'expand_less' : 'expand_more'}
                   </span>
                 </button>
@@ -156,6 +166,11 @@ const Navbar = () => {
                       className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700">
                       <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>list_alt</span>
                       My Listings
+                    </Link>
+                    <Link to="/profile-setup" 
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700">
+                      <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>person</span>
+                      Profile Settings
                     </Link>
                     <Link to="/sell" 
                       className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700">
@@ -195,10 +210,7 @@ const Navbar = () => {
 
             <button
               className={`md:hidden p-2 rounded-xl transition-colors ${transparent ? 'text-white hover:bg-white/20' : 'text-slate-800 hover:bg-slate-100'}`}
-              onClick={() => {
-                setIsMobileMenuOpen(!isMobileMenuOpen);
-                if (!isMobileMenuOpen) setShowUserMenu(false); // Close sheet if opening drawer
-              }}>
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
               <span className="material-symbols-outlined">{isMobileMenuOpen ? 'close' : 'menu'}</span>
             </button>
           </div>
@@ -253,28 +265,47 @@ const Navbar = () => {
                 Sign In
               </Link>
             ) : (
-              <div className="space-y-4">
-                <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-primary text-white font-black text-lg">
-                    {getInitials()}
+              <div className="space-y-3">
+                <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-2">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-slate-100 text-white font-black text-lg overflow-hidden shadow-inner shrink-0"
+                    style={!profile?.photo_url ? { background: 'linear-gradient(135deg, #25d366, #128c7e)' } : {}}>
+                    {profile?.photo_url ? (
+                      <img src={profile.photo_url} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      getInitials()
+                    )}
                   </div>
                   <div className="flex-grow overflow-hidden">
                     <p className="font-bold text-slate-900 truncate">{profile?.full_name || 'User'}</p>
-                    <p className="text-slate-400 text-xs truncate">{user.email}</p>
+                    <p className="text-slate-400 text-xs truncate font-medium">{user.email}</p>
                   </div>
                 </div>
+
+                <Link to="/my-ads" onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-white border border-slate-100 text-slate-700 font-bold shadow-sm">
+                  <span className="material-symbols-outlined text-primary">list_alt</span>
+                  My Listings
+                </Link>
+
+                <Link to="/profile-setup" onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-white border border-slate-100 text-slate-700 font-bold shadow-sm">
+                  <span className="material-symbols-outlined text-primary">person</span>
+                  Profile Settings
+                </Link>
+
                 {isAdmin && (
                   <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)}
-                    className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-primary text-white font-bold shadow-lg shadow-primary/20">
+                    className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-primary/10 text-primary font-bold">
                     <span className="material-symbols-outlined">shield_person</span>
                     Admin Dashboard
                   </Link>
                 )}
+
                 <button 
                   onClick={handleSignOut}
-                  className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl bg-red-50 text-red-500 font-bold text-sm transition-colors"
+                  className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-red-50 text-red-500 font-bold transition-colors"
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>logout</span>
+                  <span className="material-symbols-outlined">logout</span>
                   Sign Out
                 </button>
               </div>
@@ -284,8 +315,8 @@ const Navbar = () => {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-2 pb-5 pt-2 z-50 rounded-t-3xl"
-        style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', boxShadow: '0 -4px 30px rgba(0,0,0,0.1)', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+      <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-2 pb-5 pt-2 rounded-t-3xl z-50 transition-all shadow-[0_-4px_30px_rgba(0,0,0,0.1)] border-t border-slate-100"
+        style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}>
         <Link to="/"
           className={`flex flex-col items-center justify-center px-4 py-1.5 touch-manipulation active:scale-90 transition-all ${location.pathname === '/' ? 'text-primary' : 'text-slate-400'}`}>
           <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname === '/' ? "'FILL' 1" : "'FILL' 0", fontSize: '24px' }}>home</span>
@@ -299,105 +330,41 @@ const Navbar = () => {
         </Link>
 
         {/* Raised FAB Post button */}
-        <Link to="/sell" className="flex flex-col items-center justify-center -mt-6 touch-manipulation active:scale-90 transition-transform">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #25d366, #128c7e)', boxShadow: '0 6px 20px rgba(37,211,102,0.5)' }}>
-            <span className="material-symbols-outlined text-white" style={{ fontSize: '28px' }}>add</span>
+        <Link to="/sell" className="flex flex-col items-center justify-center -mt-6 touch-manipulation active:scale-110 transition-transform">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-1"
+            style={{ background: 'linear-gradient(135deg, #25d366, #128c7e)', boxShadow: '0 8px 25px rgba(37,211,102,0.5)' }}>
+            <span className="material-symbols-outlined text-white" style={{ fontSize: '32px' }}>add</span>
           </div>
-          <span className="text-[10px] font-bold mt-1.5 text-primary">Post</span>
+          <span className="text-[11px] font-black uppercase tracking-wider text-primary">Post</span>
         </Link>
 
-        <button 
-          onClick={() => navigate('/contact')}
-          className="flex flex-col items-center justify-center text-slate-400 px-4 py-1.5 touch-manipulation active:scale-90 transition-transform">
-          <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>chat</span>
+        <Link 
+          to="/contact"
+          className={`flex flex-col items-center justify-center px-4 py-1.5 touch-manipulation active:scale-90 transition-transform ${location.pathname === '/contact' ? 'text-primary' : 'text-slate-400'}`}>
+          <span className="material-symbols-outlined" style={{ fontVariationSettings: location.pathname === '/contact' ? "'FILL' 1" : "'FILL' 0", fontSize: '24px' }}>chat</span>
           <span className="text-[10px] font-bold mt-0.5">Chat</span>
-        </button>
+        </Link>
 
-        {/* Account tab */}
-        {user ? (
-          <button
-            onClick={() => {
-              setShowUserMenu(!showUserMenu);
-              if (!showUserMenu) setIsMobileMenuOpen(false); // Close drawer if opening sheet
-            }}
-            className="flex flex-col items-center justify-center px-4 py-1.5 touch-manipulation active:scale-90 transition-transform text-primary">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-bold text-[10px]"
-              style={{ background: 'linear-gradient(135deg, #25d366, #128c7e)' }}>
-              {getInitials()}
+        {/* User / Login Tab redirects to Drawer or Login */}
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className={`flex flex-col items-center justify-center px-4 py-1.5 touch-manipulation active:scale-90 transition-all ${isMobileMenuOpen ? 'text-primary' : 'text-slate-400'}`}>
+          {user ? (
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-bold text-[10px] overflow-hidden bg-slate-100"
+              style={!profile?.photo_url ? { background: 'linear-gradient(135deg, #25d366, #128c7e)' } : {}}>
+              {profile?.photo_url ? (
+                <img src={profile.photo_url} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                getInitials()
+              )}
             </div>
-            <span className="text-[10px] font-bold mt-0.5">Account</span>
-          </button>
-        ) : (
-          <Link to="/login"
-            className="flex flex-col items-center justify-center text-slate-400 px-4 py-1.5 touch-manipulation active:scale-90 transition-transform">
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>person</span>
-            <span className="text-[10px] font-bold mt-0.5">Sign In</span>
-          </Link>
-        )}
+          ) : (
+            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>menu</span>
+          )}
+          <span className="text-[10px] font-bold mt-0.5">{user ? 'Me' : 'Menu'}</span>
+        </button>
       </nav>
 
-      {/* Mobile sign out sheet (when user taps Account) */}
-      {user && showUserMenu && (
-        <div className="md:hidden fixed inset-0 z-[110] flex items-end">
-          {/* Background Overlay */}
-          <div 
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300" 
-            onClick={() => setShowUserMenu(false)}
-          />
-          
-          {/* Menu Sheet */}
-          <div className="relative w-full rounded-t-3xl overflow-hidden bg-white shadow-2xl animate-in slide-in-from-bottom duration-300 ease-out"
-            onClick={(e) => e.stopPropagation()}>
-            <div className="w-10 h-1 rounded-full bg-slate-200 mx-auto mt-3 mb-4" />
-            <div className="flex items-center gap-3 px-5 pb-4 border-b border-slate-100">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg"
-                style={{ background: 'linear-gradient(135deg, #25d366, #128c7e)' }}>
-                {getInitials()}
-              </div>
-              <div>
-                <p className="font-bold text-slate-900">{profile?.full_name || user.displayName || 'User'}</p>
-                <p className="text-slate-400 text-sm">{user.email}</p>
-              </div>
-            </div>
-            
-            <button
-              onClick={() => { setShowUserMenu(false); navigate('/my-ads'); }}
-              className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 text-slate-700 font-medium border-b border-slate-50 text-left"
-            >
-              <span className="material-symbols-outlined text-primary" style={{ fontSize: '22px' }}>list_alt</span>
-              My Listings
-            </button>
-            
-            <button
-              onClick={() => { setShowUserMenu(false); navigate('/sell'); }}
-              className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 text-slate-700 font-medium border-b border-slate-50 text-left"
-            >
-              <span className="material-symbols-outlined text-primary" style={{ fontSize: '22px' }}>add_circle</span>
-              Post an Ad
-            </button>
-
-            {isAdmin && (
-              <button
-                onClick={() => { setShowUserMenu(false); navigate('/admin'); }}
-                className="w-full flex items-center gap-3 px-5 py-4 hover:bg-primary/5 text-primary font-bold border-b border-slate-50 text-left"
-              >
-                <span className="material-symbols-outlined text-primary" style={{ fontSize: '22px' }}>shield_person</span>
-                Admin Dashboard
-              </button>
-            )}
-            
-            <button 
-              onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-5 py-4 hover:bg-red-50 text-red-500 font-medium text-left"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>logout</span>
-              Sign Out
-            </button>
-            <div className="pb-8" />
-          </div>
-        </div>
-      )}
 
     </>
   );

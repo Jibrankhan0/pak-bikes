@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { db } from '../firebaseClient';
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 const FALLBACK_IMAGE = 'https://lh3.googleusercontent.com/aida-public/AB6AXuAkqAYvxtLGgNC3Bvb9t00nJ-sBcycN9_SGnXiilptzakWqWic6b9wa_Babe83Wr2iNU_z62VX5eZwoIrbBzmrlRJcLSbpF2uCRNnANPTcbKnyCsjRHAQCx2ZHSKpfqTmGjMR5VcHleeZ-rZAENfAKDJBTznPA3CBvN6btZpQ-Z0sI-DhOB0yqj2uh_GnIkYxCEq5kTag8EjJVW3DhGPufXV3GIsH0yVaeHAc8X2xkfz_YbuFJds2a6YwbyOujkXRrYdjb91bZRBwI';
@@ -54,8 +54,10 @@ const Browse = () => {
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('newest');
   const [selectedCities, setSelectedCities] = useState([]);
+  const [selectedBrands, setSelectedBrands] = useState([]);
   const [maxPrice, setMaxPrice] = useState(500000);
   const [condition, setCondition] = useState('all');
+  const [sellerProfiles, setSellerProfiles] = useState({});
 
   useEffect(() => {
     fetchListings();
@@ -86,7 +88,23 @@ const Browse = () => {
         console.warn('No active listings found in database.');
       }
       // Merge real listings first, then demo bikes
-      setBikes([...activeData, ...DEMO_BIKES]);
+      const allBikes = [...activeData, ...DEMO_BIKES];
+      setBikes(allBikes);
+
+      // Fetch seller profiles for batch
+      const userIds = [...new Set(activeData.map(b => b.user_id))].filter(Boolean);
+      if (userIds.length > 0) {
+        try {
+          const profiles = {};
+          await Promise.all(userIds.map(async (uid) => {
+            const pSnap = await getDoc(doc(db, 'profiles', uid));
+            if (pSnap.exists()) profiles[uid] = pSnap.data();
+          }));
+          setSellerProfiles(profiles);
+        } catch (err) {
+          console.error('Error fetching seller profiles batch:', err);
+        }
+      }
     } catch (err) {
       console.error('Fetch exception:', err);
       setBikes(DEMO_BIKES);
@@ -99,6 +117,7 @@ const Browse = () => {
   // Apply client-side filters
   const filtered = bikes.filter(bike => {
     if (selectedCities.length > 0 && !selectedCities.includes(bike.city)) return false;
+    if (selectedBrands.length > 0 && !selectedBrands.includes(bike.brand)) return false;
     if (bike.price > maxPrice) return false;
     if (condition !== 'all' && bike.condition !== condition) return false;
     return true;
@@ -117,8 +136,14 @@ const Browse = () => {
     );
   };
 
+  const toggleBrand = (brand) => {
+    setSelectedBrands(prev =>
+      prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]
+    );
+  };
+
   const [showFilterSheet, setShowFilterSheet] = useState(false);
-  const activeFilterCount = selectedCities.length + (condition !== 'all' ? 1 : 0) + (maxPrice < 500000 ? 1 : 0);
+  const activeFilterCount = selectedCities.length + selectedBrands.length + (condition !== 'all' ? 1 : 0) + (maxPrice < 500000 ? 1 : 0);
 
   return (
     <main className="pt-20 pb-24 max-w-7xl mx-auto min-h-screen">
@@ -202,6 +227,21 @@ const Browse = () => {
               </div>
             </div>
 
+            {/* Brand */}
+            <div>
+              <h3 className="font-bold mb-3 text-sm text-on-surface-variant uppercase tracking-wide">Brand</h3>
+              <div className="flex flex-wrap gap-2">
+                {['Honda', 'Yamaha', 'Suzuki', 'United', 'Road Prince'].map(brand => (
+                  <button key={brand} onClick={() => toggleBrand(brand)}
+                    className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${
+                      selectedBrands.includes(brand) ? 'bg-primary text-white border-primary' : 'bg-surface-container border-outline-variant'
+                    }`}>
+                    {brand}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Max Price */}
             <div>
               <h3 className="font-bold mb-3 text-sm text-on-surface-variant uppercase tracking-wide">Max Price</h3>
@@ -228,7 +268,7 @@ const Browse = () => {
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => { setSelectedCities([]); setMaxPrice(500000); setCondition('all'); }}
+              <button onClick={() => { setSelectedCities([]); setSelectedBrands([]); setMaxPrice(500000); setCondition('all'); }}
                 className="flex-1 py-3 rounded-2xl border border-outline-variant text-sm font-bold">Clear</button>
               <button onClick={() => setShowFilterSheet(false)}
                 className="flex-1 py-3 rounded-2xl bg-primary text-white text-sm font-bold">Show Results</button>
@@ -256,6 +296,22 @@ const Browse = () => {
                 ))}
               </div>
             </div>
+
+            <div>
+              <h3 className="font-bold text-on-background mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">directions_bike</span> Brand
+              </h3>
+              <div className="space-y-3">
+                {['Honda', 'Yamaha', 'Suzuki', 'United', 'Road Prince', 'Ravi'].map(brand => (
+                  <label key={brand} className="flex items-center gap-3 cursor-pointer group">
+                    <input type="checkbox" checked={selectedBrands.includes(brand)}
+                      onChange={() => toggleBrand(brand)}
+                      className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary/20" />
+                    <span className="text-sm group-hover:text-primary transition-colors">{brand}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
             <div>
               <h3 className="font-bold text-on-background mb-4">Max Price (PKR)</h3>
               <input type="range" min="20000" max="500000" step="5000"
@@ -277,7 +333,7 @@ const Browse = () => {
                 ))}
               </div>
             </div>
-            <button onClick={() => { setSelectedCities([]); setMaxPrice(500000); setCondition('all'); }}
+            <button onClick={() => { setSelectedCities([]); setSelectedBrands([]); setMaxPrice(500000); setCondition('all'); }}
               className="w-full py-3 border border-outline-variant text-on-surface-variant font-bold rounded-2xl hover:border-primary hover:text-primary transition-colors text-sm">
               Clear Filters
             </button>
@@ -349,6 +405,12 @@ const Browse = () => {
                         <span className="material-symbols-outlined" style={{fontSize:'13px'}}>schedule</span>
                         {timeAgo(bike.created_at)}
                       </div>
+                      {sellerProfiles[bike.user_id]?.is_verified && (
+                        <div className="flex items-center gap-1 text-primary font-bold">
+                          <span className="material-symbols-outlined" style={{fontSize:'14px', fontVariationSettings: "'FILL' 1"}}>verified</span>
+                          Verified
+                        </div>
+                      )}
                     </div>
                     <div className="mt-auto w-full flex items-center justify-center gap-1 bg-primary-container/10 group-hover:bg-primary-container text-on-primary-container group-hover:text-white py-2 md:py-3 rounded-xl md:rounded-2xl font-bold transition-all text-xs md:text-sm">
                       <span className="md:hidden">Details</span>

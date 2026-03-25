@@ -18,8 +18,8 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (!user || !emailVerified) {
-    // Redirect to login (Auth page will show verification screen if user exists but !verified)
+  if (!user) {
+    // Redirect to login if not logged in at all
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseClient';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../context/useAuth';
+import { useEffect } from 'react';
 
 const MAX_PHOTOS = 5;
 
@@ -23,10 +24,35 @@ const Sell = () => {
     price: '',
     description: '',
     city: 'Quetta',
+    province: 'Balochistan',
     area: '',
     phone: '',
     whatsapp: true,
   });
+
+  // Pre-fill from profile
+  useEffect(() => {
+    if (user) {
+      const fetchProfile = async () => {
+        try {
+          const profileSnap = await getDoc(doc(db, 'profiles', user.uid));
+          if (profileSnap.exists()) {
+            const p = profileSnap.data();
+            setForm(prev => ({
+              ...prev,
+              city: p.city || prev.city,
+              province: p.province || prev.province,
+              area: p.area || prev.area,
+              phone: p.phone || prev.phone,
+            }));
+          }
+        } catch (err) {
+          console.error('Error fetching profile for pre-fill:', err);
+        }
+      };
+      fetchProfile();
+    }
+  }, [user]);
 
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -119,6 +145,7 @@ const MAX_SIZE = 5 * 1024 * 1024;
         price: parseFloat(form.price),
         description: form.description || null,
         city: form.city,
+        province: form.province || 'Balochistan',
         area: form.area || null,
         phone: form.phone,
         whatsapp: form.whatsapp,
@@ -135,33 +162,16 @@ const MAX_SIZE = 5 * 1024 * 1024;
     }
   };
 
+  // Verification block removed to allow unverified sellers during development
+  /*
   if (!emailVerified) {
     return (
       <main className="pt-32 pb-32 px-4 max-w-2xl mx-auto text-center">
-        <div className="w-24 h-24 rounded-[32px] bg-primary/10 flex items-center justify-center mx-auto mb-8 animate-pulse">
-          <span className="material-symbols-outlined text-5xl text-primary">verified_user</span>
-        </div>
-        <h1 className="font-headline text-4xl font-extrabold text-on-background mb-4">Verify Your Email</h1>
-        <p className="text-on-surface-variant text-lg mb-10 leading-relaxed">
-          To maintain a safe community, we require all sellers to verify their email address before posting ads.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button
-            onClick={() => navigate('/login')}
-            className="px-8 py-4 bg-primary text-white rounded-2xl font-headline font-bold shadow-lg hover:scale-105 active:scale-95 transition-all"
-          >
-            Check Verification Status
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="px-8 py-4 bg-surface-container-high text-on-surface rounded-2xl font-headline font-bold hover:bg-surface-container-highest transition-all"
-          >
-            Back to Home
-          </button>
-        </div>
+        ...
       </main>
     );
   }
+  */
 
   if (submitted) {
     return (
@@ -172,7 +182,7 @@ const MAX_SIZE = 5 * 1024 * 1024;
         <h1 className="font-headline text-4xl font-extrabold text-on-background mb-4">Ad Posted!</h1>
         <p className="text-on-surface-variant text-lg mb-8">Your bike listing is live. Buyers can now contact you directly.</p>
         <button
-          onClick={() => { setSubmitted(false); setPhotos([]); setForm({ title:'', brand:'', year:'', cc:'', condition:'used', price:'', description:'', city:'Quetta', area:'', phone:'', whatsapp: true }); }}
+          onClick={() => { setSubmitted(false); setPhotos([]); setForm({ title:'', brand:'', year:'', cc:'', condition:'used', price:'', description:'', city:'Quetta', province: 'Balochistan', area:'', phone:'', whatsapp: true }); }}
           className="px-8 py-4 bg-gradient-to-r from-primary to-primary-container text-white rounded-full font-headline font-bold shadow-lg"
         >
           Post Another Bike
@@ -342,6 +352,15 @@ const MAX_SIZE = 5 * 1024 * 1024;
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
+              <label className="block text-sm font-semibold mb-2 ml-1 text-on-surface-variant">Province</label>
+              <select name="province" value={form.province} onChange={handleFormChange}
+                className="w-full bg-surface-container-high border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all outline-none appearance-none font-bold">
+                {['Balochistan', 'Punjab', 'Sindh', 'Khyber Pakhtunkhwa', 'Gilgit-Baltistan', 'Azad Kashmir', 'Islamabad'].map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-semibold mb-2 ml-1 text-on-surface-variant">City</label>
               <select name="city" value={form.city} onChange={handleFormChange}
                 className="w-full bg-surface-container-high border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all outline-none appearance-none">
@@ -350,7 +369,7 @@ const MAX_SIZE = 5 * 1024 * 1024;
                 ))}
               </select>
             </div>
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-semibold mb-2 ml-1 text-on-surface-variant">Area / Neighbourhood</label>
               <input name="area" value={form.area} onChange={handleFormChange}
                 className="w-full bg-surface-container-high border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all outline-none"

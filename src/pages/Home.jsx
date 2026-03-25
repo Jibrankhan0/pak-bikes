@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { db } from '../firebaseClient';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getOptimizedImageUrl } from '../utils/cloudinary';
 import { useAuth } from '../context/useAuth';
 
@@ -13,6 +13,7 @@ const Home = () => {
   const [bikes, setBikes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
+  const [sellerProfiles, setSellerProfiles] = useState({});
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -51,6 +52,21 @@ const Home = () => {
       
       const activeBikes = data.filter(b => b.status === 'active').slice(0, 4);
       setBikes(activeBikes);
+      
+      // Fetch seller profiles for batch
+      const userIds = [...new Set(activeBikes.map(b => b.user_id))].filter(Boolean);
+      if (userIds.length > 0) {
+        try {
+          const profiles = {};
+          await Promise.all(userIds.map(async (uid) => {
+            const pSnap = await getDoc(doc(db, 'profiles', uid));
+            if (pSnap.exists()) profiles[uid] = pSnap.data();
+          }));
+          setSellerProfiles(profiles);
+        } catch (pErr) {
+          console.error('Error fetching seller profiles batch (home):', pErr);
+        }
+      }
       
     } catch (err) {
       console.error('💥 Home fetch exception:', err);
@@ -216,6 +232,12 @@ const Home = () => {
                       {bike.model_year || 'N/A'}
                     </span>
                   </div>
+                  {sellerProfiles[bike.user_id]?.is_verified && (
+                    <div className="flex items-center gap-1 text-[10px] md:text-xs text-primary font-bold mb-3">
+                      <span className="material-symbols-outlined" style={{fontSize:'14px', fontVariationSettings: "'FILL' 1"}}>verified</span>
+                      Verified Seller
+                    </div>
+                  )}
                   <div className="w-full py-2 md:py-2.5 rounded-xl font-bold flex items-center justify-center gap-1 text-xs md:text-sm text-white transition-all"
                     style={{background: 'linear-gradient(135deg, #25d366, #128c7e)'}}>
                     <span className="material-symbols-outlined" style={{fontSize:'14px'}}>chat</span>

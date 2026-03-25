@@ -17,7 +17,7 @@ const AdminRoute = ({ children }) => {
     );
   }
 
-  if (!user || !isAdmin || !emailVerified) {
+  if (!user || !isAdmin) {
     return <Navigate to="/" replace />;
   }
 

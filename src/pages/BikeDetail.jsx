@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { db } from '../firebaseClient';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { useAuth } from '../context/useAuth';
 import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 const DEMO_BIKES = {
@@ -70,7 +71,9 @@ const BikeDetail = () => {
   const [bike, setBike] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState(0);
-  const [showPhone, setShowPhone] = useState(false);
+  const { isAdmin } = useAuth();
+  const [sellerProfile, setSellerProfile] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchBike();
@@ -92,7 +95,20 @@ const BikeDetail = () => {
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        setBike({ id: docSnap.id, ...docSnap.data() });
+        const bikeData = { id: docSnap.id, ...docSnap.data() };
+        setBike(bikeData);
+        
+        // Fetch seller profile
+        if (bikeData.user_id) {
+          try {
+            const profileSnap = await getDoc(doc(db, 'profiles', bikeData.user_id));
+            if (profileSnap.exists()) {
+              setSellerProfile(profileSnap.data());
+            }
+          } catch (profileErr) {
+            console.error('Error fetching seller profile:', profileErr);
+          }
+        }
       } else {
         setBike(null);
       }
@@ -101,6 +117,20 @@ const BikeDetail = () => {
       setBike(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('ADMIN ACTION: Are you sure you want to delete this listing? This cannot be undone.')) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'bike_listings', id));
+      alert('Listing deleted successfully');
+      navigate('/browse');
+    } catch (err) {
+      alert('Failed to delete listing: ' + err.message);
+      setIsDeleting(false);
     }
   };
 
@@ -228,7 +258,7 @@ const BikeDetail = () => {
                 <div className="flex flex-wrap items-center gap-2 mt-1 text-on-surface-variant text-xs md:text-sm">
                   <span className="flex items-center gap-0.5">
                     <span className="material-symbols-outlined" style={{fontSize:'14px'}}>location_on</span>
-                    {bike.area ? `${bike.area}, ` : ''}{bike.city}
+                    {bike.area ? `${bike.area}, ` : ''}{bike.city}{bike.province ? `, ${bike.province}` : ''}
                   </span>
                   <span className="text-outline-variant">·</span>
                   <span>{timeAgo(bike.created_at)}</span>
@@ -262,12 +292,22 @@ const BikeDetail = () => {
           {/* Contact — visible inline on mobile between specs and description */}
           <section className="md:hidden bg-surface-container-lowest p-4 rounded-2xl border border-surface-container-high space-y-3">
             <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-xl bg-secondary-container flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-xl text-on-secondary-container">person</span>
+              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden shadow-sm"
+                style={!sellerProfile?.photo_url ? { background: 'linear-gradient(135deg, #25d366, #128c7e)' } : {}}>
+                {sellerProfile?.photo_url ? (
+                  <img src={sellerProfile.photo_url} alt="Seller" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="material-symbols-outlined text-xl text-white">person</span>
+                )}
               </div>
               <div>
-                <h4 className="text-sm font-headline font-extrabold">Private Seller</h4>
-                <p className="text-xs text-on-surface-variant">{bike.city}</p>
+                <h4 className="text-sm font-headline font-extrabold flex items-center gap-1.5">
+                  {sellerProfile?.full_name || 'Private Seller'}
+                  {sellerProfile?.is_verified && (
+                    <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                  )}
+                </h4>
+                <p className="text-xs text-on-surface-variant font-medium">{bike.city}{bike.province ? `, ${bike.province}` : ''}</p>
               </div>
             </div>
             {bike.whatsapp && (
@@ -282,6 +322,17 @@ const BikeDetail = () => {
               <span className="material-symbols-outlined text-lg">call</span>
               {showPhone ? bike.phone : 'Show Phone Number'}
             </button>
+
+            {isAdmin && (
+              <button 
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="w-full bg-error/10 text-error py-3 rounded-2xl font-bold flex items-center justify-center gap-2 text-sm border border-error/20"
+              >
+                <span className="material-symbols-outlined text-lg">delete</span>
+                {isDeleting ? 'Deleting...' : 'Delete Listing (Admin)'}
+              </button>
+            )}
           </section>
 
           {/* Description */}
@@ -316,12 +367,22 @@ const BikeDetail = () => {
           <div className="sticky top-24 space-y-5">
             <section className="bg-surface-container-lowest p-6 rounded-3xl shadow-sm border border-surface-container-high">
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-14 h-14 rounded-2xl bg-secondary-container flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-3xl text-on-secondary-container">person</span>
+                <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden shadow-md"
+                  style={!sellerProfile?.photo_url ? { background: 'linear-gradient(135deg, #25d366, #128c7e)' } : {}}>
+                  {sellerProfile?.photo_url ? (
+                    <img src={sellerProfile.photo_url} alt="Seller" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="material-symbols-outlined text-3xl text-white font-bold">person</span>
+                  )}
                 </div>
                 <div>
-                  <h4 className="text-base font-headline font-extrabold text-on-surface">Private Seller</h4>
-                  <p className="text-xs text-on-surface-variant font-medium">{bike.city}</p>
+                  <h4 className="text-base font-headline font-extrabold text-on-surface flex items-center gap-1.5">
+                    {sellerProfile?.full_name || 'Private Seller'}
+                    {sellerProfile?.is_verified && (
+                      <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                    )}
+                  </h4>
+                  <p className="text-xs text-on-surface-variant font-medium">{bike.city}{bike.province ? `, ${bike.province}` : ''}</p>
                 </div>
               </div>
               <div className="space-y-3">
@@ -338,12 +399,26 @@ const BikeDetail = () => {
                   {showPhone ? bike.phone : 'Show Phone Number'}
                 </button>
               </div>
+
+              {isAdmin && (
+                <div className="mt-6 pt-6 border-t border-outline-variant/30">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-error mb-3">Admin Actions</p>
+                  <button 
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="w-full bg-error text-white py-4 rounded-2xl font-headline font-bold flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all hover:bg-red-700 disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined">delete</span>
+                    {isDeleting ? 'Deleting...' : 'Delete Listing'}
+                  </button>
+                </div>
+              )}
             </section>
 
             <section className="bg-surface-container-low p-5 rounded-3xl text-sm text-on-surface-variant space-y-3">
               <p className="flex items-center gap-2 font-semibold text-on-surface">
                 <span className="material-symbols-outlined text-primary text-base">location_on</span>
-                {bike.area ? `${bike.area}, ` : ''}{bike.city}, Balochistan
+                {bike.area ? `${bike.area}, ` : ''}{bike.city}{bike.province ? `, ${bike.province}` : ''}
               </p>
               {bike.created_at && (
                 <p className="flex items-center gap-2">
