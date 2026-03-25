@@ -74,6 +74,7 @@ const BikeDetail = () => {
   const { isAdmin } = useAuth();
   const [sellerProfile, setSellerProfile] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showPhone, setShowPhone] = useState(false);
 
   useEffect(() => {
     fetchBike();

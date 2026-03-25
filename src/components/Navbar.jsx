@@ -167,10 +167,10 @@ const Navbar = () => {
                       <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>list_alt</span>
                       My Listings
                     </Link>
-                    <Link to="/profile-setup" 
+                    <Link to="/profile" 
                       className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700">
                       <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>person</span>
-                      Profile Settings
+                      My Profile
                     </Link>
                     <Link to="/sell" 
                       className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700">
@@ -287,10 +287,10 @@ const Navbar = () => {
                   My Listings
                 </Link>
 
-                <Link to="/profile-setup" onClick={() => setIsMobileMenuOpen(false)}
+                <Link to="/profile" onClick={() => setIsMobileMenuOpen(false)}
                   className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-white border border-slate-100 text-slate-700 font-bold shadow-sm">
                   <span className="material-symbols-outlined text-primary">person</span>
-                  Profile Settings
+                  My Profile
                 </Link>
 
                 {isAdmin && (
@@ -345,11 +345,11 @@ const Navbar = () => {
           <span className="text-[10px] font-bold mt-0.5">Chat</span>
         </Link>
 
-        {/* User / Login Tab redirects to Drawer or Login */}
-        <button
-          onClick={() => setIsMobileMenuOpen(true)}
-          className={`flex flex-col items-center justify-center px-4 py-1.5 touch-manipulation active:scale-90 transition-all ${isMobileMenuOpen ? 'text-primary' : 'text-slate-400'}`}>
-          {user ? (
+        {/* User / Login Tab redirects to Profile or opens Menu */}
+        {user ? (
+          <Link
+            to="/profile"
+            className={`flex flex-col items-center justify-center px-4 py-1.5 touch-manipulation active:scale-90 transition-all ${location.pathname === '/profile' ? 'text-primary' : 'text-slate-400'}`}>
             <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-bold text-[10px] overflow-hidden bg-slate-100"
               style={!profile?.photo_url ? { background: 'linear-gradient(135deg, #25d366, #128c7e)' } : {}}>
               {profile?.photo_url ? (
@@ -358,11 +358,16 @@ const Navbar = () => {
                 getInitials()
               )}
             </div>
-          ) : (
+            <span className="text-[10px] font-bold mt-0.5">Me</span>
+          </Link>
+        ) : (
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className={`flex flex-col items-center justify-center px-4 py-1.5 touch-manipulation active:scale-90 transition-all ${isMobileMenuOpen ? 'text-primary' : 'text-slate-400'}`}>
             <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>menu</span>
-          )}
-          <span className="text-[10px] font-bold mt-0.5">{user ? 'Me' : 'Menu'}</span>
-        </button>
+            <span className="text-[10px] font-bold mt-0.5">Menu</span>
+          </button>
+        )}
       </nav>
 
 

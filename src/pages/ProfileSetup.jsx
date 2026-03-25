@@ -43,9 +43,10 @@ const ProfileSetup = () => {
     }
   }, [user, profile]);
 
-  // If already onboarded, send them home
+  // Only redirect to home if they ARE onboarded AND we are NOT in an edit flow
+  // (We check location.state from Profile.jsx)
   useEffect(() => {
-    if (profile?.onboarded) {
+    if (profile?.onboarded && !window.history.state?.usr?.edit) {
       navigate('/', { replace: true });
     }
   }, [profile, navigate]);
