@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { db } from '../firebaseClient';
+import { doc, getDoc } from 'firebase/firestore';
 import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 const DEMO_BIKES = {
@@ -86,18 +87,21 @@ const BikeDetail = () => {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('bike_listings')
-      .select('*')
-      .eq('id', id)
-      .single();
+    try {
+      const docRef = doc(db, 'bike_listings', id);
+      const docSnap = await getDoc(docRef);
 
-    if (error || !data) {
+      if (docSnap.exists()) {
+        setBike({ id: docSnap.id, ...docSnap.data() });
+      } else {
+        setBike(null);
+      }
+    } catch (error) {
+      console.error('Error fetching bike details:', error);
       setBike(null);
-    } else {
-      setBike(data);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (loading) {

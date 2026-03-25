@@ -1,9 +1,9 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 
 const ProtectedRoute = ({ children }) => {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, emailVerified, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -18,8 +18,8 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (!user) {
-    // Redirect to login, remembering where they tried to go
+  if (!user || !emailVerified) {
+    // Redirect to login (Auth page will show verification screen if user exists but !verified)
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

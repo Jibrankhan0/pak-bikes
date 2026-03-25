@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import { useAuth } from '../context/AuthContext';
+import { db } from '../firebaseClient';
+import { collection, query, where, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { useAuth } from '../context/useAuth';
 import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 const FALLBACK_IMAGE = 'https://lh3.googleusercontent.com/aida-public/AB6AXuAkqAYvxtLGgNC3Bvb9t00nJ-sBcycN9_SGnXiilptzakWqWic6b9wa_Babe83Wr2iNU_z62VX5eZwoIrbBzmrlRJcLSbpF2uCRNnANPTcbKnyCsjRHAQCx2ZHSKpfqTmGjMR5VcHleeZ-rZAENfAKDJBTznPA3CBvN6btZpQ-Z0sI-DhOB0yqj2uh_GnIkYxCEq5kTag8EjJVW3DhGPufXV3GIsH0yVaeHAc8X2xkfz_YbuFJds2a6YwbyOujkXRrYdjb91bZRBwI';
@@ -18,28 +19,34 @@ const MyAds = () => {
 
   const fetchMyAds = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('bike_listings')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (!error) setAds(data || []);
-    setLoading(false);
+    try {
+      if (!user?.uid) return;
+      const q = query(
+        collection(db, 'bike_listings'),
+        where('user_id', '==', user.uid)
+      );
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Sort locally to avoid needing a Firestore composite index
+      data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      
+      setAds(data);
+    } catch (error) {
+      console.error('Error fetching ads:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const deleteAd = async (id) => {
     if (!window.confirm('Are you sure you want to delete this listing?')) return;
     
-    const { error } = await supabase
-      .from('bike_listings')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      alert('Error deleting ad: ' + error.message);
-    } else {
+    try {
+      await deleteDoc(doc(db, 'bike_listings', id));
       setAds(prev => prev.filter(ad => ad.id !== id));
+    } catch (error) {
+      alert('Error deleting ad: ' + error.message);
     }
   };
 

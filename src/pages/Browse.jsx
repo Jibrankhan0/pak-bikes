@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { db } from '../firebaseClient';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { getOptimizedImageUrl } from '../utils/cloudinary';
 
 const FALLBACK_IMAGE = 'https://lh3.googleusercontent.com/aida-public/AB6AXuAkqAYvxtLGgNC3Bvb9t00nJ-sBcycN9_SGnXiilptzakWqWic6b9wa_Babe83Wr2iNU_z62VX5eZwoIrbBzmrlRJcLSbpF2uCRNnANPTcbKnyCsjRHAQCx2ZHSKpfqTmGjMR5VcHleeZ-rZAENfAKDJBTznPA3CBvN6btZpQ-Z0sI-DhOB0yqj2uh_GnIkYxCEq5kTag8EjJVW3DhGPufXV3GIsH0yVaeHAc8X2xkfz_YbuFJds2a6YwbyOujkXRrYdjb91bZRBwI';
@@ -62,7 +63,6 @@ const Browse = () => {
 
   const fetchListings = async () => {
     console.log('Fetching listings...');
-    // Longer safety timeout (10s) to prevent permanent hang
     const timer = setTimeout(() => {
       console.warn('Fetch took too long, showing demo bikes');
       setBikes(DEMO_BIKES);
@@ -71,26 +71,25 @@ const Browse = () => {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('bike_listings')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+      const q = query(
+        collection(db, 'bike_listings'),
+        orderBy('created_at', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      const activeData = data.filter(b => b.status === 'active');
 
-      if (error) {
-        console.error('Supabase fetch error:', error);
-        setBikes(DEMO_BIKES);
-      } else {
-        console.log('Real data fetched:', data);
-        if (!data || data.length === 0) {
-          console.warn('No active listings found in database.');
-        }
-        // Merge real listings first, then demo bikes
-        setBikes([...(data || []), ...DEMO_BIKES]);
+      console.log('Real data fetched:', activeData);
+      if (!activeData || activeData.length === 0) {
+        console.warn('No active listings found in database.');
       }
+      // Merge real listings first, then demo bikes
+      setBikes([...activeData, ...DEMO_BIKES]);
     } catch (err) {
-       console.error('Fetch exception:', err);
-       setBikes(DEMO_BIKES);
+      console.error('Fetch exception:', err);
+      setBikes(DEMO_BIKES);
     } finally {
       clearTimeout(timer);
       setLoading(false);

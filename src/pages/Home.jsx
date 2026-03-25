@@ -1,53 +1,69 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { db } from '../firebaseClient';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { getOptimizedImageUrl } from '../utils/cloudinary';
+import { useAuth } from '../context/useAuth';
 
 const Home = () => {
   const navigate = useNavigate();
+  const { loading: authLoading } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [bikes, setBikes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
-    fetchBikes();
+    if (!authLoading) {
+      fetchBikes();
+    }
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [authLoading]);
 
   const fetchBikes = async () => {
-    console.log('Fetching featured bikes...');
-    // Longer safety timeout (10s) to prevent permanent hang
+    console.log(`Fetching featured bikes...`);
+    setFetchError(null);
     const timer = setTimeout(() => {
       console.warn('Featured bikes fetch took too long');
+      setFetchError('Connection timeout. Please check your internet or ad-blocker.');
       setLoading(false);
     }, 10000);
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('bike_listings')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(4);
+      console.log('📡 Fetching from Firestore...');
+      
+      // We fetch the latest 15 bikes and filter locally to 4 active bikes
+      // This avoids requiring a composite index in newly created Firebase projects!
+      const q = query(
+        collection(db, 'bike_listings'),
+        orderBy('created_at', 'desc'),
+        limit(15)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      if (error) {
-        console.error('Home Supabase error:', error.message);
-      } else {
-        console.log('Home data received:', data?.length || 0, 'bikes');
-        setBikes(data || []);
-      }
+      console.log('✅ Home data received:', data.length, 'bikes.');
+      
+      const activeBikes = data.filter(b => b.status === 'active').slice(0, 4);
+      setBikes(activeBikes);
+      
     } catch (err) {
-      console.error('Home fetch exception:', err);
+      console.error('💥 Home fetch exception:', err);
+      if (err.message.includes('offline')) {
+        setFetchError('You are currently offline. Please check your internet connection.');
+      } else {
+        setFetchError(`Database error: ${err.message}`);
+      }
     } finally {
       clearTimeout(timer);
       setLoading(false);
     }
   };
-
   const handleSearch = (e) => {
     e.preventDefault();
     const params = new URLSearchParams();
@@ -159,6 +175,15 @@ const Home = () => {
                 <div className="h-4 bg-slate-200 rounded w-1/2" />
               </div>
             ))
+          ) : fetchError ? (
+            <div className="col-span-full py-12 px-4 text-center bg-red-50 rounded-[2rem] border border-red-200">
+               <span className="material-symbols-outlined text-red-500 text-4xl mb-3">error</span>
+               <h3 className="text-red-800 font-bold mb-2">Failed to load listings</h3>
+               <p className="text-red-600 text-sm font-medium">{fetchError}</p>
+               <button onClick={fetchBikes} className="mt-4 px-6 py-2 bg-red-100 text-red-700 rounded-full font-bold hover:bg-red-200 transition-colors">
+                 Try Again
+               </button>
+            </div>
           ) : bikes.length > 0 ? (
             bikes.map((bike) => (
               <Link key={bike.id} to={`/bike/${bike.id}`}
@@ -174,7 +199,7 @@ const Home = () => {
                   <div className="absolute top-2 left-2 flex gap-1">
                     <span className="px-2 py-0.5 rounded-full text-[9px] md:text-[10px] font-bold shadow-sm"
                       style={{background: 'rgba(37,211,102,0.9)', color: 'white', backdropFilter: 'blur(4px)'}}>
-                      {bike.condition.toUpperCase()}
+                      {bike.condition?.toUpperCase() || 'USED'}
                     </span>
                   </div>
                 </div>
@@ -205,6 +230,7 @@ const Home = () => {
                <p className="text-slate-500 font-medium">No active listings in Balochistan yet.</p>
             </div>
           )}
+
         </div>
       </section>
 

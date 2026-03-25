@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -9,13 +9,19 @@ const Navbar = () => {
   const userMenuRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, isAdmin, signOut } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // RELIABLE: Auto-close all menus on any route change
+  useEffect(() => {
+    setShowUserMenu(false);
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   // Close user menu on outside click
   useEffect(() => {
@@ -31,15 +37,30 @@ const Navbar = () => {
   const isHome = location.pathname === '/';
   const transparent = isHome && !scrolled;
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (e) => {
+    if (e) e.stopPropagation();
+    console.log('🔘 Sign out button clicked');
+    
+    // 1. Give immediate visual feedback by closing menus
     setShowUserMenu(false);
     setIsMobileMenuOpen(false);
-    await signOut();
+    
+    try {
+      console.log('⌛ Calling signOut from context...');
+      // AuthContext.signOut is aggressive and will trigger a page reload
+      await signOut();
+    } catch (err) {
+      console.error('⚠️ Sign out failed:', err);
+      // Nuclear fallback if the context call itself fails
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+      window.location.href = '/login';
+    }
   };
 
   // Get user initials
   const getInitials = () => {
-    const name = profile?.full_name || user?.user_metadata?.full_name || user?.email || '';
+    const name = profile?.full_name || user?.displayName || user?.email || '';
     const parts = name.split(/[\s@]/).filter(Boolean);
     return parts.slice(0, 2).map(p => p[0]?.toUpperCase()).join('') || '?';
   };
@@ -115,7 +136,7 @@ const Navbar = () => {
                     {getInitials()}
                   </div>
                   <span className={`hidden md:block text-sm font-bold transition-colors ${transparent ? 'text-white' : 'text-slate-700'}`}>
-                    {(profile?.full_name || user.user_metadata?.full_name || '').split(' ')[0] || 'Me'}
+                    {(profile?.full_name || user.displayName || '').split(' ')[0] || 'Me'}
                   </span>
                   <span className={`material-symbols-outlined text-sm transition-colors ${transparent ? 'text-white/70' : 'text-slate-400'}`} style={{ fontSize: '18px' }}>
                     {showUserMenu ? 'expand_less' : 'expand_more'}
@@ -124,23 +145,30 @@ const Navbar = () => {
 
                 {/* Dropdown */}
                 {showUserMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl overflow-hidden z-50"
+                  <div className="hidden md:block absolute right-0 top-full mt-2 w-52 rounded-2xl overflow-hidden z-50 animate-in fade-in zoom-in duration-200"
                     style={{ background: 'white', boxShadow: '0 8px 30px rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.06)' }}>
                     {/* User info */}
                     <div className="px-4 py-3 border-b border-slate-100">
-                      <p className="font-bold text-slate-900 text-sm truncate">{profile?.full_name || user.user_metadata?.full_name || 'User'}</p>
+                      <p className="font-bold text-slate-900 text-sm truncate">{profile?.full_name || user.displayName || 'User'}</p>
                       <p className="text-slate-400 text-xs truncate">{user.email}</p>
                     </div>
-                    <Link to="/my-ads" onClick={() => setShowUserMenu(false)}
+                    <Link to="/my-ads" 
                       className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700">
                       <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>list_alt</span>
                       My Listings
                     </Link>
-                    <Link to="/sell" onClick={() => setShowUserMenu(false)}
+                    <Link to="/sell" 
                       className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700">
                       <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>add_circle</span>
                       Post an Ad
                     </Link>
+                    {isAdmin && (
+                      <Link to="/admin" onClick={() => setShowUserMenu(false)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-primary/5 transition-colors text-sm font-bold text-primary">
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>shield_person</span>
+                        Admin Dashboard
+                      </Link>
+                    )}
                     <button onClick={handleSignOut}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition-colors text-sm font-medium text-red-500">
                       <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>logout</span>
@@ -167,7 +195,10 @@ const Navbar = () => {
 
             <button
               className={`md:hidden p-2 rounded-xl transition-colors ${transparent ? 'text-white hover:bg-white/20' : 'text-slate-800 hover:bg-slate-100'}`}
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              onClick={() => {
+                setIsMobileMenuOpen(!isMobileMenuOpen);
+                if (!isMobileMenuOpen) setShowUserMenu(false); // Close sheet if opening drawer
+              }}>
               <span className="material-symbols-outlined">{isMobileMenuOpen ? 'close' : 'menu'}</span>
             </button>
           </div>
@@ -175,10 +206,10 @@ const Navbar = () => {
       </header>
 
       {/* Mobile Side Drawer */}
-      <div className={`md:hidden fixed inset-0 z-[100] transition-all duration-300 ${isMobileMenuOpen ? 'visible' : 'invisible'}`}>
+      <div className={`md:hidden fixed inset-0 z-[100] transition-all duration-300 ${isMobileMenuOpen ? 'visible opacity-100' : 'invisible opacity-0 pointer-events-none'}`}>
         {/* Backdrop */}
         <div 
-          className={`absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0'}`}
+          className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
           onClick={() => setIsMobileMenuOpen(false)}
         />
         
@@ -232,6 +263,13 @@ const Navbar = () => {
                     <p className="text-slate-400 text-xs truncate">{user.email}</p>
                   </div>
                 </div>
+                {isAdmin && (
+                  <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl bg-primary text-white font-bold shadow-lg shadow-primary/20">
+                    <span className="material-symbols-outlined">shield_person</span>
+                    Admin Dashboard
+                  </Link>
+                )}
                 <button 
                   onClick={handleSignOut}
                   className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl bg-red-50 text-red-500 font-bold text-sm transition-colors"
@@ -269,7 +307,9 @@ const Navbar = () => {
           <span className="text-[10px] font-bold mt-1.5 text-primary">Post</span>
         </Link>
 
-        <button className="flex flex-col items-center justify-center text-slate-400 px-4 py-1.5 touch-manipulation active:scale-90 transition-transform">
+        <button 
+          onClick={() => navigate('/contact')}
+          className="flex flex-col items-center justify-center text-slate-400 px-4 py-1.5 touch-manipulation active:scale-90 transition-transform">
           <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>chat</span>
           <span className="text-[10px] font-bold mt-0.5">Chat</span>
         </button>
@@ -277,7 +317,10 @@ const Navbar = () => {
         {/* Account tab */}
         {user ? (
           <button
-            onClick={() => setShowUserMenu(!showUserMenu)}
+            onClick={() => {
+              setShowUserMenu(!showUserMenu);
+              if (!showUserMenu) setIsMobileMenuOpen(false); // Close drawer if opening sheet
+            }}
             className="flex flex-col items-center justify-center px-4 py-1.5 touch-manipulation active:scale-90 transition-transform text-primary">
             <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-bold text-[10px]"
               style={{ background: 'linear-gradient(135deg, #25d366, #128c7e)' }}>
@@ -296,9 +339,15 @@ const Navbar = () => {
 
       {/* Mobile sign out sheet (when user taps Account) */}
       {user && showUserMenu && (
-        <div className="md:hidden fixed inset-0 z-[60] flex items-end" onClick={() => setShowUserMenu(false)}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div className="relative w-full rounded-t-3xl overflow-hidden" style={{ background: 'white' }}
+        <div className="md:hidden fixed inset-0 z-[110] flex items-end">
+          {/* Background Overlay */}
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300" 
+            onClick={() => setShowUserMenu(false)}
+          />
+          
+          {/* Menu Sheet */}
+          <div className="relative w-full rounded-t-3xl overflow-hidden bg-white shadow-2xl animate-in slide-in-from-bottom duration-300 ease-out"
             onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full bg-slate-200 mx-auto mt-3 mb-4" />
             <div className="flex items-center gap-3 px-5 pb-4 border-b border-slate-100">
@@ -307,22 +356,41 @@ const Navbar = () => {
                 {getInitials()}
               </div>
               <div>
-                <p className="font-bold text-slate-900">{profile?.full_name || user.user_metadata?.full_name || 'User'}</p>
+                <p className="font-bold text-slate-900">{profile?.full_name || user.displayName || 'User'}</p>
                 <p className="text-slate-400 text-sm">{user.email}</p>
               </div>
             </div>
-            <Link to="/my-ads" onClick={() => setShowUserMenu(false)}
-              className="flex items-center gap-3 px-5 py-4 hover:bg-slate-50 text-slate-700 font-medium border-b border-slate-50">
+            
+            <button
+              onClick={() => { setShowUserMenu(false); navigate('/my-ads'); }}
+              className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 text-slate-700 font-medium border-b border-slate-50 text-left"
+            >
               <span className="material-symbols-outlined text-primary" style={{ fontSize: '22px' }}>list_alt</span>
               My Listings
-            </Link>
-            <Link to="/sell" onClick={() => setShowUserMenu(false)}
-              className="flex items-center gap-3 px-5 py-4 hover:bg-slate-50 text-slate-700 font-medium">
+            </button>
+            
+            <button
+              onClick={() => { setShowUserMenu(false); navigate('/sell'); }}
+              className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 text-slate-700 font-medium border-b border-slate-50 text-left"
+            >
               <span className="material-symbols-outlined text-primary" style={{ fontSize: '22px' }}>add_circle</span>
               Post an Ad
-            </Link>
-            <button onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-5 py-4 hover:bg-red-50 text-red-500 font-medium">
+            </button>
+
+            {isAdmin && (
+              <button
+                onClick={() => { setShowUserMenu(false); navigate('/admin'); }}
+                className="w-full flex items-center gap-3 px-5 py-4 hover:bg-primary/5 text-primary font-bold border-b border-slate-50 text-left"
+              >
+                <span className="material-symbols-outlined text-primary" style={{ fontSize: '22px' }}>shield_person</span>
+                Admin Dashboard
+              </button>
+            )}
+            
+            <button 
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 px-5 py-4 hover:bg-red-50 text-red-500 font-medium text-left"
+            >
               <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>logout</span>
               Sign Out
             </button>
@@ -330,6 +398,7 @@ const Navbar = () => {
           </div>
         </div>
       )}
+
     </>
   );
 };

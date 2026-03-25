@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import { useAuth } from '../context/AuthContext';
+import { auth, db } from '../firebaseClient';
+import { doc, setDoc } from 'firebase/firestore';
+import { updatePassword } from 'firebase/auth'; // Import updatePassword
+import { useAuth } from '../context/useAuth';
 
 const ProfileSetup = () => {
   const { user, profile, refreshProfile } = useAuth();
@@ -13,18 +15,22 @@ const ProfileSetup = () => {
     full_name: '',
     phone: '',
     city: 'Quetta',
+    password: '', // New field
   });
 
-  // Pre-fill from auth metadata if available
+  // New users now always have a password from signup
+
+  // Pre-fill from existing profile or auth data
   useEffect(() => {
     if (user) {
       setForm(prev => ({
         ...prev,
-        full_name: user.user_metadata?.full_name || '',
-        phone: user.user_metadata?.phone || '',
+        full_name: profile?.full_name || user.displayName || '',
+        phone: profile?.phone || '',
+        city: profile?.city || 'Quetta'
       }));
     }
-  }, [user]);
+  }, [user, profile]);
 
   // If already onboarded, send them home
   useEffect(() => {
@@ -49,23 +55,28 @@ const ProfileSetup = () => {
     setError('');
 
     try {
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          full_name: form.full_name,
-          phone: form.phone,
-          city: form.city,
-          onboarded: true,
-          updated_at: new Date().toISOString(),
-        });
+      if (!user?.uid) throw new Error('User not authenticated');
 
-      if (updateError) throw updateError;
+      // 1. Save Profile to Firestore
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Database connection timed out. Please ensure you have created a Firestore Database.')), 8000);
+      });
+
+      const setDocPromise = setDoc(doc(db, 'profiles', user.uid), {
+        full_name: form.full_name,
+        phone: form.phone,
+        city: form.city,
+        onboarded: true,
+        updated_at: new Date().toISOString(),
+      }, { merge: true });
+
+      await Promise.race([setDocPromise, timeoutPromise]);
 
       // Refresh profile in context and go home
       await refreshProfile();
       navigate('/', { replace: true });
     } catch (err) {
+      console.error(err);
       setError(err.message || 'Failed to save profile. Please try again.');
     } finally {
       setLoading(false);
@@ -140,6 +151,8 @@ const ProfileSetup = () => {
             </div>
           </div>
 
+          {/* Legacy password field removed */}
+
           <button
             type="submit" disabled={loading}
             className="w-full py-5 bg-gradient-to-r from-primary to-primary-container text-white rounded-2xl font-headline font-extrabold text-lg shadow-[0_12px_24px_rgba(37,211,102,0.3)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
@@ -154,6 +167,7 @@ const ProfileSetup = () => {
             )}
           </button>
         </form>
+
 
         <p className="mt-8 text-center text-slate-400 text-xs font-semibold px-4">
           By completing your profile, you help build a trusted community for motorcycle lovers in Balochistan.

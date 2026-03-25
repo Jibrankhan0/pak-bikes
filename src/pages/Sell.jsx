@@ -1,12 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import { useAuth } from '../context/AuthContext';
+import { db } from '../firebaseClient';
+import { collection, addDoc } from 'firebase/firestore';
+import { useAuth } from '../context/useAuth';
 
 const MAX_PHOTOS = 5;
 
 const Sell = () => {
-  const { user } = useAuth();
+  const { user, emailVerified } = useAuth();
   const navigate = useNavigate();
   const [photos, setPhotos] = useState([]); // { file, preview, url, uploading, error }
   const [submitting, setSubmitting] = useState(false);
@@ -107,35 +108,60 @@ const MAX_SIZE = 5 * 1024 * 1024;
     }
     setSubmitting(true);
 
-    const { data, error } = await supabase.from('bike_listings').insert([{
-      user_id: user.id,
-      title: form.title,
-      brand: form.brand || null,
-      model_year: form.year ? parseInt(form.year) : null,
-      cc: form.cc || null,
-      condition: form.condition,
-      price: parseFloat(form.price),
-      description: form.description || null,
-      city: form.city,
-      area: form.area || null,
-      phone: form.phone,
-      whatsapp: form.whatsapp,
-      photos: uploadedPhotos.map(p => p.url),
-      status: 'active',
-    }]).select();
-
-    setSubmitting(false);
-    if (error) {
+    try {
+      const docRef = await addDoc(collection(db, 'bike_listings'), {
+        user_id: user.uid,
+        title: form.title,
+        brand: form.brand || null,
+        model_year: form.year ? parseInt(form.year) : null,
+        cc: form.cc || null,
+        condition: form.condition,
+        price: parseFloat(form.price),
+        description: form.description || null,
+        city: form.city,
+        area: form.area || null,
+        phone: form.phone,
+        whatsapp: form.whatsapp,
+        photos: uploadedPhotos.map(p => p.url),
+        status: 'active',
+        created_at: new Date().toISOString(),
+      });
+      
+      setSubmitting(false);
+      navigate(`/bike/${docRef.id}`);
+    } catch (error) {
+      setSubmitting(false);
       alert('Failed to post listing. Please try again.\n' + error.message);
-      return;
-    }
-    
-    if (data && data[0]) {
-      navigate(`/bike/${data[0].id}`);
-    } else {
-      setSubmitted(true);
     }
   };
+
+  if (!emailVerified) {
+    return (
+      <main className="pt-32 pb-32 px-4 max-w-2xl mx-auto text-center">
+        <div className="w-24 h-24 rounded-[32px] bg-primary/10 flex items-center justify-center mx-auto mb-8 animate-pulse">
+          <span className="material-symbols-outlined text-5xl text-primary">verified_user</span>
+        </div>
+        <h1 className="font-headline text-4xl font-extrabold text-on-background mb-4">Verify Your Email</h1>
+        <p className="text-on-surface-variant text-lg mb-10 leading-relaxed">
+          To maintain a safe community, we require all sellers to verify their email address before posting ads.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button
+            onClick={() => navigate('/login')}
+            className="px-8 py-4 bg-primary text-white rounded-2xl font-headline font-bold shadow-lg hover:scale-105 active:scale-95 transition-all"
+          >
+            Check Verification Status
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="px-8 py-4 bg-surface-container-high text-on-surface rounded-2xl font-headline font-bold hover:bg-surface-container-highest transition-all"
+          >
+            Back to Home
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   if (submitted) {
     return (

@@ -1,26 +1,25 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient';
+import { auth, db } from '../firebaseClient';
+import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
-const AuthContext = createContext({});
+export const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [emailVerified, setEmailVerified] = useState(false);
 
   const fetchProfile = async (userId) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      
-      if (error) {
-        console.warn('Profile fetch error:', error.message);
-        setProfile(null);
+      const docRef = doc(db, 'profiles', userId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setProfile({ id: docSnap.id, ...docSnap.data() });
       } else {
-        setProfile(data);
+        console.warn('Profile not found in Firestore');
+        setProfile(null);
       }
     } catch (err) {
       console.error('Error in fetchProfile:', err);
@@ -35,75 +34,83 @@ export const AuthProvider = ({ children }) => {
       if (mounted) setLoading(false);
     }, 3500);
 
-    const initialize = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted) return;
-
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        
-        if (currentUser) {
-          await fetchProfile(currentUser.id);
-        }
-      } catch (err) {
-        console.error('Initialization error:', err);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    initialize();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!mounted) return;
-      console.log('Auth event:', event);
+      console.log('Firebase auth state changed:', currentUser?.uid);
       
-      const currentUser = session?.user ?? null;
       setUser(currentUser);
       
       if (currentUser) {
-        await fetchProfile(currentUser.id);
+        setEmailVerified(currentUser.emailVerified);
+        await fetchProfile(currentUser.uid);
       } else {
         setProfile(null);
+        setEmailVerified(false);
       }
       setLoading(false);
+      clearTimeout(timer);
     });
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      unsubscribe();
     };
   }, []);
 
+  const refreshUser = async () => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      setUser({ ...auth.currentUser }); // Trigger state update
+      setEmailVerified(auth.currentUser.emailVerified);
+    }
+  };
+
   const signOut = async () => {
     try {
-      setLoading(true);
-      // 1. Try normal sign out
-      await supabase.auth.signOut();
+      console.log('🏁 Starting aggressive logout...');
       
-      // 2. Clear all local storage (Nuclear option)
+      // 1. Clear local React state immediately for instant UI response
+      setLoading(true); // Show loading state if components use it
+      setUser(null);
+      setProfile(null);
+      setEmailVerified(false);
+
+      // 2. Sign out from Firebase (non-blocking for UI)
+      firebaseSignOut(auth).catch(err => console.warn('Firebase signout async error:', err));
+      
+      // 3. Clear all storage
+      console.log('🧹 Clearing all local and session storage...');
       window.localStorage.clear();
-      
-      // 3. Clear session storage too
       window.sessionStorage.clear();
       
-      // 4. Force hard reload to home
-      window.location.href = '/';
+      // 4. Force hard reload Document to clean everything
+      console.log('🚀 Redirecting and reloading...');
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
+      
     } catch (err) {
-      console.error('Sign out error:', err.message);
+      console.error('❌ Critical logout error fallback:', err);
+      setUser(null);
+      setProfile(null);
       window.localStorage.clear();
+      window.sessionStorage.clear();
       window.location.href = '/';
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile: () => user && fetchProfile(user.id) }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      profile, 
+      isAdmin: profile?.role === 'admin',
+      emailVerified, 
+      loading, 
+      signOut, 
+      refreshProfile: () => user && fetchProfile(user.uid),
+      refreshUser
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);

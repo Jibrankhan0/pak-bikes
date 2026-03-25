@@ -8,6 +8,8 @@ import Browse from './pages/Browse';
 import Sell from './pages/Sell';
 import BikeDetail from './pages/BikeDetail';
 import Auth from './pages/Auth';
+import Admin from './pages/Admin';
+import AdminRoute from './components/AdminRoute';
 import ProfileSetup from './pages/ProfileSetup';
 import MyAds from './pages/MyAds';
 import Contact from './pages/Contact';
@@ -49,6 +51,7 @@ function App() {
             />
             <Route path="bike/:id" element={<BikeDetail />} />
             <Route path="contact" element={<Contact />} />
+            <Route path="admin" element={<AdminRoute><Admin /></AdminRoute>} />
           </Route>
         </Routes>
       </Router>
